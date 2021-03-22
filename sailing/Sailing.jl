@@ -6,6 +6,7 @@ using LinearAlgebra
 
 Lx = 720
 Ly = 720
+res = (Lx, Ly)
 
 frame_delay = 0
 fps_alpha = 0.1
@@ -14,7 +15,6 @@ verbose = false
 
 
 ## General Constants
-
 
 uvec(ph) = [cos(ph), -sin(ph)]
 # [cos(ph), sin(ph)] is normal
@@ -28,7 +28,7 @@ sgnrt(x, p) = sign(x)*abs(x)^(1/p)
 
 circle(r, size) = r[1]^2 + r[2]^2 <= (size[1]/2)^2
 rectangle(r, size) = (abs(r[1]) < size[1]/2) & (abs(r[2]) < size[2]/2)
-
+#=
 mutable struct View
     pos::Vector{Float64}
     zoom::Float64
@@ -39,6 +39,7 @@ mutable struct View
         return new(pos, zoom, bounds, background)
     end
 end
+=#
 
 
 ## Game-Specific Constants
@@ -66,17 +67,19 @@ sail_p = 14.
 background = [ 0.4*RGB(1-i/Lx, 1-j/Ly, (i+j)/(Lx+Ly)) for i = 1:Lx, j = 1:Ly ]
 
 s = Scene(raw = true, camera = cam2d!, resolution = (Lx, Ly))
-B = Node(Board(s, (Lx, Ly), 0.0, copy(background)))
 
 sz_b = [0.075, 0.05]
 Boat1 = Entity([0.5, 0.5], 0., sz_b, RGB(0.6470, 0.1647, 0.1647))
-Gb = Node(Group("Boat", sz_b, rectangle, Boat1))
+Gb = Group("Boat", sz_b, rectangle, Boat1)
 Fb = Node([0., 0.])
 
 sz_s = [0.01, 0.075]
 Sail1 = Entity(Boat1.pos, pi/2, sz_s, RGB(1., 1., 1.))
-Gs = Node(Group("Sail", sz_s, rectangle, Sail1))
+Gs = Group("Sail", sz_s, rectangle, Sail1)
 Fs = Node([0., 0.])
+
+B = Node(Board([Gs, Gb], copy(background)))
+V = Node(View(s, res, [0.5, 0.5], 2.))
 
 Wind1 = Node(Wind(0.1, 0.))
 
@@ -94,8 +97,8 @@ last_open = false
 @async while true
     global last_open
     the_time[] = time() - t0
-    last_open && !isopen(B[].scene) && break
-    last_open = isopen(B[].scene)
+    last_open && !isopen(V[].scene) && break
+    last_open = isopen(V[].scene)
     sleep(frame_delay)
 end
 
@@ -112,16 +115,19 @@ end
 =#
 it = Node(0)
 Frame = lift(the_time) do t
-    GameBoard.clear!(B[])
+    GameBoard.clear!(B[], V[])
 
+    it[] = it[] + 1
+
+    fps_cur = get_fps(T[], t)
+    #=
     buttons = s.events.keyboardbuttons[]
 
     fps_cur = get_fps(T[], t)
     # Chain observable flag for fps_cur minimum?
     if fps_cur > 2. # Very low FPS messes up physics, so skip frames with low FPS
         it[] = it[] + 1
-
-        B[].fps = fps_alpha * fps_cur + (1-fps_alpha) * B[].fps
+        V[].fps = fps_alpha * fps_cur + (1-fps_alpha) * V[].fps
 
         ## Start Controls
         # TODO: add support for multiple simultaneous key presses
@@ -165,26 +171,28 @@ Frame = lift(the_time) do t
         w1 = 1 + sgnrt(sin(ph_s), sail_p)
         w2 = 1 - sgnrt(sin(ph_s), sail_p)
 
-        Fs[] = v_wr + (norm(v_wr, 2)/2)*(w1*rot(-pi/2)*u_s + w2*rot(pi/2)*u_s)
-        Fb[] = sail_down * proj(Fs[], u_b) + Fd
+        Fs[] = [0, 0]# v_wr + (norm(v_wr, 2)/2)*(w1*rot(-pi/2)*u_s + w2*rot(pi/2)*u_s)
+        Fb[] = [0, 0]# sail_down * proj(Fs[], u_b) + Fd
 
-        Gb[].entities[1].dpos = proj(Gb[].entities[1].dpos + Fb[] / fps_cur, u_b)
-        Gs[].entities[1].dpos = Gb[].entities[1].dpos
+        #Gb[].entities[1].dpos = [0, 0]#proj(Gb[].entities[1].dpos + Fb[] / fps_cur, u_b)
+        #Gs[].entities[1].dpos = [0, 0]#Gb[].entities[1].dpos
         ## End Physics
 
-        if verbose
-            println("vb = ", v_b, ", vwr = ", v_wr, ", fps_cur = ", fps_cur)
-        end
-        GameEntities.evolve!(Gb[], fps_cur)
-        GameEntities.evolve!(Gs[], fps_cur)
-
+        #if verbose
+        #    println("vb = ", v_b, ", vwr = ", v_wr, ", fps_cur = ", fps_cur)
+        #end
+        #GameEntities.evolve!(Gb[], fps_cur)
+        #GameEntities.evolve!(Gs[], fps_cur)
+        #GameEntities.evolve!(Gb[], 1/30)
+        #GameEntities.evolve!(Gs[], 1/30)
+        =#
         # Boundary Conditions
-        Gb[].entities[1].pos = mod.(Gb[].entities[1].pos, 1.)
-        Gs[].entities[1].pos = mod.(Gs[].entities[1].pos, 1.)
+        #B[].groups[1].entities[1].pos = [0, 0] #mod.(Gb[].entities[1].pos, 1.)
+        #B[].groups[2].entities[1].pos = [0, 0] #mod.(Gs[].entities[1].pos, 1.)
 
-        GameBoard.draw_entity!(B[], [Gs[], Gb[]])
-    end
-    B[].image
+        GameBoard.draw_entity!(B[], V[])
+    #end
+    V[].image
 end
 
-GameBoard.display!(B[], Frame)
+GameBoard.display!(V[], Frame)
