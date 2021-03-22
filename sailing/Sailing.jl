@@ -68,18 +68,18 @@ background = [ 0.4*RGB(1-i/Lx, 1-j/Ly, (i+j)/(Lx+Ly)) for i = 1:Lx, j = 1:Ly ]
 
 s = Scene(raw = true, camera = cam2d!, resolution = (Lx, Ly))
 
-sz_b = [0.075, 0.05]
-Boat1 = Entity([0.5, 0.5], 0., sz_b, RGB(0.6470, 0.1647, 0.1647))
-Gb = Group("Boat", sz_b, rectangle, Boat1)
-Fb = Node([0., 0.])
-
 sz_s = [0.01, 0.075]
-Sail1 = Entity(Boat1.pos, pi/2, sz_s, RGB(1., 1., 1.))
+Sail1 = Entity([0.15, 0.], 0., sz_s, RGB(1., 1., 1.))
 Gs = Group("Sail", sz_s, rectangle, Sail1)
 Fs = Node([0., 0.])
 
+sz_b = [0.075, 0.05]
+Boat1 = Entity(Sail1.pos, pi/3, sz_b, RGB(0.6470, 0.1647, 0.1647))
+Gb = Group("Boat", sz_b, rectangle, Boat1)
+Fb = Node([0., 0.])
+
 B = Node(Board([Gs, Gb], copy(background)))
-V = Node(View(s, res, [0.5, 0.5], 2.))
+V = Node(View(s, res, [0., 0.], 3.))
 
 Wind1 = Node(Wind(0.1, 0.))
 
@@ -104,7 +104,7 @@ end
 
 
 ## Animation
-#=
+
 on(s.events.mousebuttons) do mb
     r_mouse = [s.events.mouseposition[][1]/Lx, s.events.mouseposition[][2]/Ly]
 
@@ -112,7 +112,7 @@ on(s.events.mousebuttons) do mb
         println(r_mouse)
     end
 end
-=#
+
 it = Node(0)
 Frame = lift(the_time) do t
     GameBoard.clear!(B[], V[])
