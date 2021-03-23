@@ -187,8 +187,8 @@ Frame = lift(the_time) do t
         GameEntities.evolve!(Gs, fps_cur)
 
         # Boundary Conditions
-        Gs.entities[1].pos = mod.(Gb.entities[1].pos, 1.)
-        Gb.entities[1].pos = mod.(Gs.entities[1].pos, 1.)
+        Gs.entities[1].pos = mod.(Gs.entities[1].pos .+ 1., 2.) .- 1.
+        Gb.entities[1].pos = mod.(Gb.entities[1].pos .+ 1., 2.) .- 1.
 
         B[].groups = [Gs, Gb]
 
