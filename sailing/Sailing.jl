@@ -11,7 +11,7 @@ res = (Lx, Ly)
 frame_delay = 0
 fps_alpha = 0.1
 
-verbose = true
+verbose = false
 
 
 ## General Constants
@@ -28,6 +28,15 @@ sgnrt(x, p) = sign(x)*abs(x)^(1/p)
 
 circle(r, size) = r[1]^2 + r[2]^2 <= (size[1]/2)^2
 rectangle(r, size) = (abs(r[1]) < size[1]/2) & (abs(r[2]) < size[2]/2)
+
+function rand_2vecs_square(n, bounds)
+    V = Vector{Vector{Float64}}(undef, n)
+    range = [bounds[2][1] - bounds[1][1], bounds[2][2] - bounds[1][2]]
+    for i = 1:n
+        V[i] = rand(Float64, 2) .* range .+ bounds[1]
+    end
+    return V
+end
 #=
 mutable struct View
     pos::Vector{Float64}
@@ -78,7 +87,14 @@ Boat1 = Entity(Sail1.pos, 0., sz_b, RGB(0.6470, 0.1647, 0.1647))
 Gb0 = Group("Boat", sz_b, rectangle, Boat1)
 Fb = Node([0., 0.])
 
-B = Node(Board([Gs0, Gb0], copy(background)))
+n_r = 25
+sz_r = [0.05, 0.05]
+pos_r = rand_2vecs_square(n_r, [[-1., -1.], [1, 1.]])
+ang_r = zeros(Float64, n_r)
+c_r = RGB(0.7, 0.7, 0.7) .* ones(n_r)
+Gr0 = Group("Rock", sz_r, circle, pos_r, ang_r, c_r)
+
+B = Node(Board([Gs0, Gb0, Gr0], copy(background)))
 V = Node(View(s, res, [0., 0.], 1.))
 
 Wind1 = Node(Wind(0.1, 0.))
@@ -190,7 +206,11 @@ Frame = lift(the_time) do t
         Gs.entities[1].pos = mod.(Gs.entities[1].pos .+ 1., 2.) .- 1.
         Gb.entities[1].pos = mod.(Gb.entities[1].pos .+ 1., 2.) .- 1.
 
-        B[].groups = [Gs, Gb]
+        # Move View
+        V[].pos = Gs.entities[1].pos
+
+        B[].groups[1] = Gs
+        B[].groups[2] = Gb
 
         GameBoard.draw_entity!(B[], V[])
     end
