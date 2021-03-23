@@ -28,7 +28,7 @@ mutable struct View
     zoom::Float64
     image::Array{RGB{Float64}, 2}
     function View(scene::Scene, res::Tuple{Int64, Int64}, pos::Vector{Float64}, zoom::Float64)
-        return new(scene, res, Inf, pos, zoom, zeros(RGB{Float64}, res))
+        return new(scene, res, 30, pos, zoom, zeros(RGB{Float64}, res))
     end
 end
 

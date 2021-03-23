@@ -11,7 +11,7 @@ res = (Lx, Ly)
 frame_delay = 0
 fps_alpha = 0.1
 
-verbose = false
+verbose = true
 
 
 ## General Constants
@@ -69,17 +69,17 @@ background = [ 0.4*RGB(1-i/Lx, 1-j/Ly, (i+j)/(Lx+Ly)) for i = 1:Lx, j = 1:Ly ]
 s = Scene(raw = true, camera = cam2d!, resolution = (Lx, Ly))
 
 sz_s = [0.01, 0.075]
-Sail1 = Entity([0.15, 0.], 0., sz_s, RGB(1., 1., 1.))
-Gs = Group("Sail", sz_s, rectangle, Sail1)
+Sail1 = Entity([0.15, 0.], pi/2, sz_s, RGB(1., 1., 1.))
+Gs0 = Group("Sail", sz_s, rectangle, Sail1)
 Fs = Node([0., 0.])
 
 sz_b = [0.075, 0.05]
-Boat1 = Entity(Sail1.pos, pi/3, sz_b, RGB(0.6470, 0.1647, 0.1647))
-Gb = Group("Boat", sz_b, rectangle, Boat1)
+Boat1 = Entity(Sail1.pos, 0., sz_b, RGB(0.6470, 0.1647, 0.1647))
+Gb0 = Group("Boat", sz_b, rectangle, Boat1)
 Fb = Node([0., 0.])
 
-B = Node(Board([Gs, Gb], copy(background)))
-V = Node(View(s, res, [0., 0.], 3.))
+B = Node(Board([Gs0, Gb0], copy(background)))
+V = Node(View(s, res, [0., 0.], 1.))
 
 Wind1 = Node(Wind(0.1, 0.))
 
@@ -120,14 +120,16 @@ Frame = lift(the_time) do t
     it[] = it[] + 1
 
     fps_cur = get_fps(T[], t)
-    #=
+
     buttons = s.events.keyboardbuttons[]
 
-    fps_cur = get_fps(T[], t)
     # Chain observable flag for fps_cur minimum?
     if fps_cur > 2. # Very low FPS messes up physics, so skip frames with low FPS
         it[] = it[] + 1
         V[].fps = fps_alpha * fps_cur + (1-fps_alpha) * V[].fps
+
+        Gs = B[].groups[1]
+        Gb = B[].groups[2]
 
         ## Start Controls
         # TODO: add support for multiple simultaneous key presses
@@ -138,27 +140,27 @@ Frame = lift(the_time) do t
         bd = ispressed(buttons, Keyboard.d)
         bspace = ispressed(buttons, Keyboard.space)
 
-        Gs[].entities[1].dang = (be - bq) * sail_turn_speed + (bd - ba) * boat_turn_speed
-        Gb[].entities[1].dang = (bd - ba) * boat_turn_speed
+        Gs.entities[1].dang = (be - bq) * sail_turn_speed + (bd - ba) * boat_turn_speed
+        Gb.entities[1].dang = (bd - ba) * boat_turn_speed
         sail_down = 1 - bspace
         ## End Controls
 
         ## Start Physics
-        Gs[].entities[1].ang = mod(Gs[].entities[1].ang, 2pi)
-        Gb[].entities[1].ang = mod(Gb[].entities[1].ang, 2pi)
+        Gs.entities[1].ang = mod(Gs.entities[1].ang, 2pi)
+        Gb.entities[1].ang = mod(Gb.entities[1].ang, 2pi)
         Wind1[].ang = mod(Wind1[].ang, 2pi)
 
-        ph_s = Gs[].entities[1].ang
-        ph_b = Gb[].entities[1].ang
+        ph_s = Gs.entities[1].ang
+        ph_b = Gb.entities[1].ang
         ph_w = Wind1[].ang
 
         u_s = uvec(ph_s) # why are these unit vector y components negated?
         u_b = uvec(ph_b)
 
-        v_b = Gb[].entities[1].dpos
+        v_b = Gb.entities[1].dpos
         v_wr = Wind1[].v - v_b
 
-        Gs[].entities[1].pos = Gb[].entities[1].pos
+        Gs.entities[1].pos = Gb.entities[1].pos
 
         # Check sign - does not match paper work
 
@@ -171,27 +173,27 @@ Frame = lift(the_time) do t
         w1 = 1 + sgnrt(sin(ph_s), sail_p)
         w2 = 1 - sgnrt(sin(ph_s), sail_p)
 
-        Fs[] = [0, 0]# v_wr + (norm(v_wr, 2)/2)*(w1*rot(-pi/2)*u_s + w2*rot(pi/2)*u_s)
-        Fb[] = [0, 0]# sail_down * proj(Fs[], u_b) + Fd
+        Fs[] = v_wr + (norm(v_wr, 2)/2)*(w1*rot(-pi/2)*u_s + w2*rot(pi/2)*u_s)
+        Fb[] = sail_down * proj(Fs[], u_b) + Fd
 
-        #Gb[].entities[1].dpos = [0, 0]#proj(Gb[].entities[1].dpos + Fb[] / fps_cur, u_b)
-        #Gs[].entities[1].dpos = [0, 0]#Gb[].entities[1].dpos
+        Gb.entities[1].dpos = u_b/10#proj(Gb.entities[1].dpos + Fb[] / fps_cur, u_b)
+        Gs.entities[1].dpos = Gb.entities[1].dpos
         ## End Physics
 
-        #if verbose
-        #    println("vb = ", v_b, ", vwr = ", v_wr, ", fps_cur = ", fps_cur)
-        #end
-        #GameEntities.evolve!(Gb[], fps_cur)
-        #GameEntities.evolve!(Gs[], fps_cur)
-        #GameEntities.evolve!(Gb[], 1/30)
-        #GameEntities.evolve!(Gs[], 1/30)
-        =#
+        if verbose
+            println("vb = ", v_b, ", rb = ", Gb.entities[1].pos, ", fps_cur = ", round(fps_cur, digits = 1))
+        end
+        GameEntities.evolve!(Gb, fps_cur)
+        GameEntities.evolve!(Gs, fps_cur)
+
         # Boundary Conditions
-        #B[].groups[1].entities[1].pos = [0, 0] #mod.(Gb[].entities[1].pos, 1.)
-        #B[].groups[2].entities[1].pos = [0, 0] #mod.(Gs[].entities[1].pos, 1.)
+        Gs.entities[1].pos = mod.(Gb.entities[1].pos, 1.)
+        Gb.entities[1].pos = mod.(Gs.entities[1].pos, 1.)
+
+        B[].groups = [Gs, Gb]
 
         GameBoard.draw_entity!(B[], V[])
-    #end
+    end
     V[].image
 end
 
