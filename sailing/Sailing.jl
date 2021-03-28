@@ -8,7 +8,7 @@ Lx = 720
 Ly = 720
 res = (Lx, Ly)
 
-zoom = 2.
+zoom = 1.5
 
 frame_delay = 0
 fps_alpha = 0.1
@@ -56,12 +56,33 @@ end
 ## Game-Specific Constants
 
 mutable struct Wind
+    fcn::Function
+    a::Float64
+    v::Vector{Float64}
     mag::Float64
     ang::Float64
-    v::Vector{Float64}
-    function Wind(strength::Float64, ang::Float64)
-        return new(strength, mod(ang, 2pi), strength*[cos(ang), sin(ang)])
+    function Wind(fcn::Function, a::Float64, r::Vector{Float64})
+        v = fcn(r, a)
+        mag = norm(v, 2)
+        ang = atan(v[2]/v[1])
+        return new(fcn, a, v, mag, ang)
     end
+    #=
+    function Wind(fcn::Function, strength::Float64, ang::Float64)
+        return new(fcn, strength*[cos(ang), sin(ang)], strength, mod(ang, 2pi), )
+    end=#
+end
+function update!(W::Wind, r::Vector{Float64})
+    W.v = W.fcn(r, W.a)
+    W.mag = norm(W.v, 2)
+    W.ang = atan(W.v[2]/W.v[1])
+end
+
+function solar_wind(r, a, r0 = [0., 0.])
+    R = r - r0
+    Rm = norm(R, 2)
+    Rh = R/Rm
+    return a/Rm^2 * Rh
 end
 
 sail_turn_speed = pi/3
@@ -96,15 +117,15 @@ ang_r = zeros(Float64, n_r)
 c_r = RGB(0.55, 0.55, 0.55) .* ones(n_r)
 Gr0 = Group("Rock", sz_r, circle, pos_r, ang_r, c_r)
 
-Wind1 = Node(Wind(0.1, 0.))
+Wind1 = Node(Wind(solar_wind, 0.02, Sail1.pos))
 
 sz_i = [0.05, 0.01]
-c_i_low = RGB(0., 0.2, 0.2)
-c_i_high = RGB(0., 0.7, 0.7)
-ang_i = Wind1[].ang
-pos_i = Sail1.pos + sz_i.*[cos(ang_i), sin(ang_i)]
+c_i_low = RGB(0., 0.5, 1.)
+c_i_high = RGB(1., 0., 0.)
+ang_i = -Wind1[].ang
+pos_i = Sail1.pos + sz_i[1]/2 .* [cos(ang_i), sin(ang_i)]
 Indicator = Entity(Sail1.pos, Wind1[].ang, sz_i, c_i_high)
-Gi0 = Group("Indicator", sz_i, rectangle, Indicator)
+Gi0 = Group("Indicator", copy(sz_i), rectangle, Indicator)
 
 B = Node(Board([Gi0, Gs0, Gb0, Gr0], copy(background)))
 V = Node(View(s, res, [0., 0.], zoom))
@@ -150,7 +171,7 @@ Frame = lift(the_time) do t
     buttons = s.events.keyboardbuttons[]
 
     # Chain observable flag for fps_cur minimum?
-    if fps_cur > 2. # Very low FPS messes up physics, so skip frames with low FPS
+    if fps_cur > 0. # Very low FPS messes up physics, so skip frames with low FPS
         it[] = it[] + 1
         V[].fps = fps_alpha * fps_cur + (1-fps_alpha) * V[].fps
 
@@ -173,6 +194,8 @@ Frame = lift(the_time) do t
         ## End Controls
 
         ## Start Physics
+        update!(Wind1[], Gs.entities[1].pos)
+
         Gs.entities[1].ang = mod(Gs.entities[1].ang, 2pi)
         Gb.entities[1].ang = mod(Gb.entities[1].ang, 2pi)
         Wind1[].ang = mod(Wind1[].ang, 2pi)
@@ -207,8 +230,14 @@ Frame = lift(the_time) do t
         Gs.entities[1].dpos = Gb.entities[1].dpos
         Gi.entities[1].dpos = Gb.entities[1].dpos
 
-        Gi.entities[1].ang = ph_w
-        Gi.entities[1].pos = Gs.entities[1].pos + (sz_i/2) .* [cos(ph_w), sin(ph_w)]
+        l_max = 3.
+        l_min = 0.3
+        l_a = 10.
+        m_w  = l_a*Wind1[].mag
+        Gi.size[1] = sz_i[1]*min(l_a*Wind1[].mag + l_min, l_max)
+        Gi.entities[1].ang = -ph_w
+        Gi.entities[1].pos = Gs.entities[1].pos + Gi.size[1]/2 .* sign(Gs.entities[1].pos[1]) .* [cos(ph_w), sin(ph_w)]
+        Gi.entities[1].color = (c_i_low * (l_max - m_w) + c_i_high * (l_min + m_w))/(l_max - l_min)
         ## End Physics
 
         if verbose
