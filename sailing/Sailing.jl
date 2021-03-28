@@ -8,6 +8,8 @@ Lx = 720
 Ly = 720
 res = (Lx, Ly)
 
+zoom = 2.
+
 frame_delay = 0
 fps_alpha = 0.1
 
@@ -87,17 +89,25 @@ Boat1 = Entity(Sail1.pos, 0., sz_b, RGB(0.6470, 0.1647, 0.1647))
 Gb0 = Group("Boat", sz_b, rectangle, Boat1)
 Fb = Node([0., 0.])
 
-n_r = 25
+n_r = 130
 sz_r = [0.05, 0.05]
 pos_r = rand_2vecs_square(n_r, [[-1., -1.], [1, 1.]])
 ang_r = zeros(Float64, n_r)
-c_r = RGB(0.7, 0.7, 0.7) .* ones(n_r)
+c_r = RGB(0.55, 0.55, 0.55) .* ones(n_r)
 Gr0 = Group("Rock", sz_r, circle, pos_r, ang_r, c_r)
 
-B = Node(Board([Gs0, Gb0, Gr0], copy(background)))
-V = Node(View(s, res, [0., 0.], 1.))
-
 Wind1 = Node(Wind(0.1, 0.))
+
+sz_i = [0.05, 0.01]
+c_i_low = RGB(0., 0.2, 0.2)
+c_i_high = RGB(0., 0.7, 0.7)
+ang_i = Wind1[].ang
+pos_i = Sail1.pos + sz_i.*[cos(ang_i), sin(ang_i)]
+Indicator = Entity(Sail1.pos, Wind1[].ang, sz_i, c_i_high)
+Gi0 = Group("Indicator", sz_i, rectangle, Indicator)
+
+B = Node(Board([Gi0, Gs0, Gb0, Gr0], copy(background)))
+V = Node(View(s, res, [0., 0.], zoom))
 
 T = Node([0.0, 0.0])
 function get_fps(T, t)
@@ -144,8 +154,9 @@ Frame = lift(the_time) do t
         it[] = it[] + 1
         V[].fps = fps_alpha * fps_cur + (1-fps_alpha) * V[].fps
 
-        Gs = B[].groups[1]
-        Gb = B[].groups[2]
+        Gi = B[].groups[1]
+        Gs = B[].groups[2]
+        Gb = B[].groups[3]
 
         ## Start Controls
         # TODO: add support for multiple simultaneous key presses
@@ -194,6 +205,10 @@ Frame = lift(the_time) do t
 
         Gb.entities[1].dpos = u_b/10#proj(Gb.entities[1].dpos + Fb[] / fps_cur, u_b)
         Gs.entities[1].dpos = Gb.entities[1].dpos
+        Gi.entities[1].dpos = Gb.entities[1].dpos
+
+        Gi.entities[1].ang = ph_w
+        Gi.entities[1].pos = Gs.entities[1].pos + (sz_i/2) .* [cos(ph_w), sin(ph_w)]
         ## End Physics
 
         if verbose
@@ -201,6 +216,7 @@ Frame = lift(the_time) do t
         end
         GameEntities.evolve!(Gb, fps_cur)
         GameEntities.evolve!(Gs, fps_cur)
+        GameEntities.evolve!(Gi, fps_cur)
 
         # Boundary Conditions
         Gs.entities[1].pos = mod.(Gs.entities[1].pos .+ 1., 2.) .- 1.
@@ -209,8 +225,9 @@ Frame = lift(the_time) do t
         # Move View
         V[].pos = Gs.entities[1].pos
 
-        B[].groups[1] = Gs
-        B[].groups[2] = Gb
+        B[].groups[1] = Gi
+        B[].groups[2] = Gs
+        B[].groups[3] = Gb
 
         GameBoard.draw_entity!(B[], V[])
     end
