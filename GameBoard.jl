@@ -13,10 +13,11 @@ export Board, View
 rotate(ph) = [cos(ph) -sin(ph); sin(ph) cos(ph)]
 
 mutable struct Board
+    size::Tuple{Float64, Float64}
     groups::Vector{Group}
     background::Array{RGB{Float64}, 2}
-    function Board(groups::Vector{Group}, background::Array{RGB{Float64}, 2})
-        return new(groups, background)
+    function Board(size::Tuple{Float64, Float64}, groups::Vector{Group}, background::Array{RGB{Float64}, 2})
+        return new(size, groups, background)
     end
 end
 
