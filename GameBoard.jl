@@ -42,8 +42,7 @@ function draw_entity!(B::Board, V::View, G::Group)
     O = V.pos
     z = V.zoom / 2.
     Lmax = maximum(V.res)
-    for i = 1:G.n
-        E = G.entities[i]
+    for E in G.entities
         R = E.pos
         bounds_B = E.bounds
         bounds_V = [[0., 0.], [0., 0.]]

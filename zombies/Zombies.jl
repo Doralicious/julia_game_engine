@@ -15,7 +15,7 @@ zoom = 1.5
 frame_delay = 0
 fps_alpha = 0.1
 
-verbose = true
+verbose = false
 
 
 ## General Constants
@@ -57,9 +57,15 @@ end
 
 ## Game-Specific Constants
 
-move_speed = 0.2
-player_width = 0.05
+player_speed = 0.2
+zombie_speed = 0.15
 
+player_width = 0.02
+zombie_width = 0.02
+rock_width = 0.05
+
+n_z = 10
+n_r = 130
 
 ## Initializations
 
@@ -72,14 +78,19 @@ sz_p = [player_width, player_width]
 player = Entity([0.25, 0.], pi/2, sz_p, RGB(0., 1., 1.))
 Gp0 = Group("player", sz_p, circle, player)
 
-n_r = 130
-sz_r = [0.05, 0.05]
+sz_z = [zombie_width, zombie_width]
+pos_z = rand_2vecs_square(n_z, [.- board_size./2, board_size./2])
+ang_z = zeros(Float64, n_z)
+c_z = RGB(1., 0., 0.) .* ones(n_z)
+Gz0 = Group("zombie", sz_z, circle, pos_z, ang_z, c_z)
+
+sz_r = [rock_width, rock_width]
 pos_r = rand_2vecs_square(n_r, [.- board_size./2, board_size./2])
 ang_r = zeros(Float64, n_r)
 c_r = RGB(0.55, 0.55, 0.55) .* ones(n_r)
-Gr0 = Group("Rock", sz_r, circle, pos_r, ang_r, c_r)
+Gr0 = Group("rock", sz_r, circle, pos_r, ang_r, c_r)
 
-B = Node(Board(board_size, [Gp0, Gr0], copy(background)))
+B = Node(Board(board_size, [Gp0, Gz0, Gr0], copy(background)))
 V = Node(View(s, res, [0., 0.], zoom))
 
 T = Node([0.0, 0.0])
@@ -123,43 +134,57 @@ Frame = lift(the_time) do t
     buttons = s.events.keyboardbuttons[]
 
     # Chain observable flag for fps_cur minimum?
-    if fps_cur > 0. # Very low FPS messes up physics, so skip frames with low FPS
+    if fps_cur > 2. # Very low FPS messes up physics, so skip frames with low FPS
         it[] = it[] + 1
         V[].fps = fps_alpha * fps_cur + (1-fps_alpha) * V[].fps
 
         Gp = B[].groups[1]
-        Gr = B[].groups[2]
+        Gz = B[].groups[2]
+        Gr = B[].groups[3]
+
+        P = Gp.entities[1]
 
         ## Start Controls
-        # TODO: add support for multiple simultaneous key presses
-        #   for multi-press: try ispressed(buttons, <tuple/vector of buttons>)
         bw = ispressed(buttons, Keyboard.w)
         ba = ispressed(buttons, Keyboard.a)
         bs = ispressed(buttons, Keyboard.s)
         bd = ispressed(buttons, Keyboard.d)
+        bspace = ispressed(buttons, Keyboard.space)
 
         dpos = [bd - ba, bw - bs]
-        Gp.entities[1].dpos = if norm(dpos, 2) >= 10^-2
-            move_speed*dpos/norm(dpos, 2)
+        P.dpos = if norm(dpos, 2) >= 10^-2
+            player_speed * dpos/norm(dpos, 2)
         else
             [0., 0.]
         end
+
+        zombie_dir = -2*bspace + 1
         ## End Controls
 
         ## Start Physics
+        for Z in Gz.entities
+            dr_pz = P.pos - Z.pos
+            Z.dpos = if norm(dr_pz, 2) >= 10^-2
+                zombie_dir * zombie_speed * dr_pz/norm(dr_pz, 2)
+            else
+                [0., 0.]
+            end
+        end
         ## End Physics
 
         GameEntities.evolve!(Gp, fps_cur)
+        GameEntities.evolve!(Gz, fps_cur)
 
         # Boundary Conditions
         #Gp.entities[1].pos[1] = mod(Gp.entities[1].pos[1] + B[].size[1]/2, B[].size[1]) - B[].size[1]/2
         #Gp.entities[1].pos[2] = mod(Gp.entities[1].pos[2] + B[].size[2]/2, B[].size[2]) - B[].size[2]/2
 
         # Move View
-        V[].pos = Gp.entities[1].pos
+        V[].pos = P.pos
 
         B[].groups[1] = Gp
-        B[].groups[2] = Gr
+        B[].groups[2] = Gz
+        B[].groups[3] = Gr
 
         GameBoard.draw_entity!(B[], V[])
 
