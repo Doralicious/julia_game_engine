@@ -3,7 +3,7 @@ module GameBoard
 
 using LinearAlgebra: norm
 using Colors: RGB
-using Makie: Observable, Scene, image!, center!
+using Makie: Observable, Scene, display, image!, center!
 
 import Main.GameEntities: Group, Entity
 
@@ -105,8 +105,9 @@ function draw_line!(B::Board, r1::Vector{Float64}, r2::Vector{Float64}, c::RGB{F
 end
 
 function display!(V::View, Frame::Observable{Array{RGB{Float64}, 2}})
-    image!(V.scene, Frame)[end]
+    image!(V.scene, Frame)
     center!(V.scene)
+    display(V.scene)
 end
 
 
